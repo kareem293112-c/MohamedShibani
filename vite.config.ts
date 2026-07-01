@@ -2,10 +2,30 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(), 
+      tailwindcss(),
+      VitePWA({
+        registerType: 'prompt',
+        includeAssets: ['icon.svg'],
+        manifest: {
+          name: 'Accounting System',
+          short_name: 'Accounting',
+          theme_color: '#ffffff',
+          icons: [
+            {
+              src: 'icon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml'
+            }
+          ]
+        }
+      })
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

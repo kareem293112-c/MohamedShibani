@@ -4,12 +4,28 @@ import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import Inventory from './components/Inventory';
 import TransactionHistory from './components/TransactionHistory';
-import { LayoutDashboard, ShoppingCart, Package, History, Calculator, HelpCircle, Layers, Globe, Sun, Moon, Eye, Wifi, WifiOff, Download, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, History, Calculator, HelpCircle, Layers, Globe, Sun, Moon, Eye, Wifi, WifiOff, Download, RefreshCw, AlertTriangle, Menu, X, Info } from 'lucide-react';
 import { translations } from './translations';
 import { pwaDb } from './db/pwaDb';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
+  // --- PWA UPDATE LOGIC ---
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      console.log(`[PWA] SW Registered: ${r}`);
+    },
+    onRegisterError(error) {
+      console.log(`[PWA] SW Registration error: ${error}`);
+    },
+  });
+
   // --- STATE ---
+  const [showSidebar, setShowSidebar] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'history'>('dashboard');
@@ -385,211 +401,77 @@ export default function App() {
             : 'bg-white border-slate-100 shadow-slate-100'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
           
           {/* Logo & Title */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full xl:w-auto gap-4">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              type="button"
-              className={`flex items-center gap-3 text-right hover:opacity-90 transition focus:outline-none cursor-pointer group ${
-                lang === 'ar' ? 'text-right' : 'text-left'
-              }`}
-            >
-              <div className="bg-indigo-600 text-white p-2.5 rounded-2xl shadow-md shadow-indigo-100 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                <Calculator className="w-6 h-6" />
-              </div>
-              <div>
-                <h1
-                  className={`text-xl font-black tracking-tight flex items-center gap-2 ${
-                    theme === 'dark'
-                      ? 'text-zinc-100'
-                      : theme === 'eye-care'
-                      ? 'text-[#433422]'
-                      : 'text-slate-800'
-                  }`}
-                >
-                  {t.appName}
-                </h1>
-              </div>
-            </button>
-          </div>
-
-          {/* Configuration and Controls (Language, Theme, Reset, Date) */}
-          <div className="flex items-center gap-3 flex-wrap justify-between w-full xl:w-auto xl:justify-end">
-            
-            {/* PWA Install & Offline Status Controls */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Online / Offline Sync Badge */}
-              <button
-                onClick={triggerDataSync}
-                disabled={isSyncing || !isOnline}
-                type="button"
-                className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-1.5 transition border ${
-                  isSyncing
-                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-900/40 dark:text-blue-400'
-                    : !isOnline
-                    ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-400'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-900/40 dark:text-emerald-400 hover:bg-emerald-100/30 dark:hover:bg-emerald-950/30'
-                } cursor-pointer shadow-sm`}
-                title={
-                  !isOnline
-                    ? (lang === 'ar' ? 'أنت غير متصل بالإنترنت - يتم حفظ بياناتك محلياً بشكل آمن' : 'You are offline - your data is being saved locally and securely')
-                    : (lang === 'ar' ? 'اضغط للمزامنة اليدوية الفورية' : 'Click to trigger immediate manual sync')
-                }
-              >
-                {isSyncing ? (
-                  <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
-                ) : !isOnline ? (
-                  <WifiOff className="w-4 h-4 text-amber-500" />
-                ) : (
-                  <Wifi className="w-4 h-4 text-emerald-500" />
-                )}
-                <span>
-                  {isSyncing
-                    ? (lang === 'ar' ? 'جاري المزامنة...' : 'Syncing...')
-                    : !isOnline
-                    ? (lang === 'ar' ? 'وضع الأوفلاين (حفظ محلي)' : 'Offline Mode (saving locally)')
-                    : (lang === 'ar' ? 'متصل ومزامن' : 'Online & Synced')}
-                </span>
-              </button>
-
-              {/* Install PWA Button */}
-              {showInstallBtn && (
-                <button
-                  onClick={handleInstallApp}
-                  type="button"
-                  className="text-xs font-black px-3 py-2.5 rounded-xl border transition flex items-center gap-2 cursor-pointer shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 hover:scale-[1.02] active:scale-[0.98]"
-                  title={lang === 'ar' ? 'تثبيت كبرنامج على الكمبيوتر (Windows Desktop App)' : 'Install as a Desktop App'}
-                >
-                  <Download className="w-4 h-4 text-indigo-100 animate-bounce" />
-                  <span>{lang === 'ar' ? 'تثبيت كبرنامج للكمبيوتر' : 'Install Desktop App'}</span>
-                </button>
-              )}
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            type="button"
+            className={`flex items-center gap-3 text-right hover:opacity-90 transition focus:outline-none cursor-pointer group ${
+              lang === 'ar' ? 'text-right' : 'text-left'
+            }`}
+          >
+            <div className="bg-indigo-600 text-white p-2.5 rounded-2xl shadow-md shadow-indigo-100 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+              <Calculator className="w-6 h-6" />
             </div>
-
-            {/* Bilingual Controls Box */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Language Selector */}
-              <button
-                onClick={toggleLanguage}
-                type="button"
-                className={`text-xs font-bold px-3.5 py-2.5 rounded-xl border transition flex items-center gap-2 cursor-pointer shadow-sm ${
+            <div>
+              <h1
+                className={`text-xl font-black tracking-tight flex items-center gap-2 ${
                   theme === 'dark'
-                    ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700'
+                    ? 'text-zinc-100'
                     : theme === 'eye-care'
-                    ? 'bg-[#fcf8f2] border-[#e3d3b4] text-[#433422] hover:bg-[#faf2e4]'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}
-                title="تغيير اللغة / Switch Language"
-              >
-                <Globe className="w-4 h-4 text-indigo-500" />
-                <span>{t.langToggle}</span>
-              </button>
-
-              {/* Theme Pickers (Pills) */}
-              <div
-                className={`p-1 rounded-xl border flex items-center gap-1 shadow-sm ${
-                  theme === 'dark'
-                    ? 'bg-zinc-800 border-zinc-700'
-                    : theme === 'eye-care'
-                    ? 'bg-[#faf2e4] border-[#e3d3b4]'
-                    : 'bg-slate-100 border-slate-200'
+                    ? 'text-[#433422]'
+                    : 'text-slate-800'
                 }`}
               >
-                {/* Light Theme Button */}
-                <button
-                  type="button"
-                  onClick={() => changeTheme('light')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    theme === 'light'
-                      ? 'bg-white text-indigo-600 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-600'
-                  }`}
-                  title={t.themeLight}
-                >
-                  <Sun className="w-4 h-4" />
-                </button>
-
-                {/* Dark Theme Button */}
-                <button
-                  type="button"
-                  onClick={() => changeTheme('dark')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    theme === 'dark'
-                      ? 'bg-zinc-950 text-indigo-400 shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-400'
-                  }`}
-                  title={t.themeDark}
-                >
-                  <Moon className="w-4 h-4" />
-                </button>
-
-                {/* Eye Care Theme Button */}
-                <button
-                  type="button"
-                  onClick={() => changeTheme('eye-care')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    theme === 'eye-care'
-                      ? 'bg-[#7a644b] text-white shadow-sm'
-                      : 'text-[#90795e] hover:text-[#433422]'
-                  }`}
-                  title={t.themeEyeCare}
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
-              </div>
+                {t.appName}
+              </h1>
             </div>
+          </button>
 
-            {/* Quick Date Display */}
-            <span
-              className={`text-xs font-bold px-3.5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm border ${
-                theme === 'dark'
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-300'
-                  : theme === 'eye-care'
-                  ? 'bg-[#faf2e4] border-[#e3d3b4] text-[#5e4931]'
-                  : 'bg-slate-100 border-slate-200/60 text-slate-600'
-              }`}
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>
-                📅{' '}
-                {currentTime.toLocaleDateString(
-                  lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US',
-                  { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
-                )}
+          {/* Hamburger Menu (3 lines) Button */}
+          <button
+            onClick={() => setShowSidebar(!showSidebar)}
+            type="button"
+            className={`relative p-3 rounded-2xl border transition duration-200 flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 z-[110] ${
+              theme === 'dark'
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:text-white'
+                : theme === 'eye-care'
+                ? 'bg-[#faf2e4] border-[#e3d3b4] text-[#433422] hover:bg-[#ebdcc0]'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+            title={lang === 'ar' ? 'القائمة الجانبية وإعدادات النظام' : 'Sidebar & System Settings'}
+          >
+            <div className="w-5 h-4 flex flex-col justify-between items-center relative">
+              <motion.span
+                animate={showSidebar ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className={`w-5 h-0.5 rounded-full ${
+                  theme === 'eye-care' ? 'bg-[#433422]' : 'bg-current'
+                } absolute top-0`}
+              />
+              <motion.span
+                animate={showSidebar ? { opacity: 0, scale: 0 } : { opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+                className={`w-5 h-0.5 rounded-full ${
+                  theme === 'eye-care' ? 'bg-[#433422]' : 'bg-current'
+                } absolute top-[7px]`}
+              />
+              <motion.span
+                animate={showSidebar ? { rotate: -45, y: -7 } : { rotate: 0, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className={`w-5 h-0.5 rounded-full ${
+                  theme === 'eye-care' ? 'bg-[#433422]' : 'bg-current'
+                } absolute bottom-0`}
+              />
+            </div>
+            {needRefresh && !showSidebar && (
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
               </span>
-              <span className="text-slate-300">|</span>
-              <span
-                className={`font-mono text-[13px] font-extrabold ${
-                  theme === 'dark'
-                    ? 'text-indigo-400'
-                    : theme === 'eye-care'
-                    ? 'text-amber-800'
-                    : 'text-indigo-600'
-                }`}
-                dir="ltr"
-              >
-                ⏰{' '}
-                {currentTime.toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: true,
-                })}
-              </span>
-            </span>
-
-            {/* Reset Button */}
-            <button
-              onClick={() => setShowClearConfirm(true)}
-              type="button"
-              className="text-xs font-semibold text-rose-500 hover:text-rose-700 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 px-3.5 py-2.5 rounded-xl transition border border-rose-100 dark:border-rose-900/40 cursor-pointer shadow-sm hover:shadow-md font-bold"
-              title={t.resetDataBtn}
-            >
-              {t.resetDataBtn}
-            </button>
-          </div>
+            )}
+          </button>
 
         </div>
       </header>
@@ -597,7 +479,7 @@ export default function App() {
 
       {/* 3. Main Tabs Navigation Section */}
       <div
-        className={`sticky top-[135px] xl:top-[77px] z-20 shadow-sm transition-all duration-300 ${
+        className={`sticky top-[74px] z-20 shadow-sm transition-all duration-300 ${
           theme === 'dark'
             ? 'bg-zinc-900 border-b border-zinc-800'
             : theme === 'eye-care'
@@ -706,6 +588,8 @@ export default function App() {
       {/* 4. Active Tab Content container */}
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         
+
+
         {activeTab === 'dashboard' && (
           <Dashboard
             transactions={transactions}
@@ -779,23 +663,354 @@ export default function App() {
           >
             © {new Date().getFullYear()} {t.appName}. {t.footerRights}.
           </p>
-          <p
-            className={`mt-2.5 text-[11px] font-black tracking-wide flex items-center justify-center gap-1.5 ${
-              theme === 'dark'
-                ? 'text-indigo-400'
-                : theme === 'eye-care'
-                ? 'text-amber-950'
-                : 'text-indigo-600'
-            }`}
-          >
-            <span>✨</span>
-            <span>
-              {lang === 'ar' ? 'تطوير وإشراف: محمد شيباني (Mohamed Shibani)' : 'Developed & Supervised by: Mohamed Shibani'}
-            </span>
-            <span>✨</span>
-          </p>
         </div>
       </footer>
+
+      {/* Sidebar Drawer */}
+      <AnimatePresence>
+        {showSidebar && (
+          <div className="fixed inset-0 z-[100] overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowSidebar(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm cursor-pointer"
+            />
+
+            <div className={`fixed inset-y-0 max-w-full flex ${lang === 'ar' ? 'left-0' : 'right-0'}`}>
+              {/* Sliding Panel */}
+              <motion.div
+                initial={{ x: lang === 'ar' ? '-100%' : '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: lang === 'ar' ? '-100%' : '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                className={`w-screen max-w-sm shadow-2xl h-full flex flex-col justify-between ${
+                  theme === 'dark'
+                    ? 'bg-zinc-900 border-zinc-800 text-zinc-100'
+                    : theme === 'eye-care'
+                    ? 'bg-[#f4ebe1] border-[#ebdcc0] text-[#433422]'
+                    : 'bg-white border-slate-100 text-slate-800'
+                } border-l border-r`}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
+              >
+                {/* Drawer Header */}
+                <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Info className={`w-5 h-5 ${
+                      theme === 'dark' ? 'text-indigo-400' : theme === 'eye-care' ? 'text-amber-800' : 'text-indigo-600'
+                    }`} />
+                    <h2 className="text-lg font-black tracking-tight">
+                      {lang === 'ar' ? 'معلومات النظام' : 'System Information'}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setShowSidebar(false)}
+                    type="button"
+                    className={`p-2 rounded-xl transition cursor-pointer ${
+                      theme === 'dark'
+                        ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white'
+                        : theme === 'eye-care'
+                        ? 'hover:bg-[#ebdcc0] text-[#7a644b]'
+                        : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Drawer Body */}
+                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                  
+                  {/* 1. Language & Theme Settings */}
+                  <div className={`p-5 rounded-2xl border ${
+                    theme === 'dark'
+                      ? 'bg-zinc-950/50 border-zinc-800/80'
+                      : theme === 'eye-care'
+                      ? 'bg-[#fcf8f2] border-[#e3d3b4]'
+                      : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <h3 className="text-xs font-black uppercase tracking-wider mb-3 text-slate-400 dark:text-zinc-500">
+                      {lang === 'ar' ? 'إعدادات اللغة والمظهر' : 'Language & Appearance'}
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Language Selector */}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-bold">{lang === 'ar' ? 'لغة الواجهة:' : 'Language:'}</span>
+                        <button
+                          onClick={toggleLanguage}
+                          type="button"
+                          className={`text-xs font-bold px-3.5 py-2 rounded-xl border transition flex items-center gap-2 cursor-pointer shadow-sm ${
+                            theme === 'dark'
+                              ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700'
+                              : theme === 'eye-care'
+                              ? 'bg-[#fcf8f2] border-[#e3d3b4] text-[#433422] hover:bg-[#faf2e4]'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Globe className="w-4 h-4 text-indigo-500" />
+                          <span>{t.langToggle}</span>
+                        </button>
+                      </div>
+
+                      {/* Theme Selector */}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-bold">{lang === 'ar' ? 'سمة المظهر:' : 'Theme:'}</span>
+                        <div
+                          className={`p-1 rounded-xl border flex items-center gap-1 shadow-sm ${
+                            theme === 'dark'
+                              ? 'bg-zinc-800 border-zinc-700'
+                              : theme === 'eye-care'
+                              ? 'bg-[#faf2e4] border-[#e3d3b4]'
+                              : 'bg-slate-100 border-slate-200'
+                          }`}
+                        >
+                          {/* Light Theme Button */}
+                          <button
+                            type="button"
+                            onClick={() => changeTheme('light')}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              theme === 'light'
+                                ? 'bg-white text-indigo-600 shadow-sm'
+                                : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                            title={t.themeLight}
+                          >
+                            <Sun className="w-4 h-4" />
+                          </button>
+
+                          {/* Dark Theme Button */}
+                          <button
+                            type="button"
+                            onClick={() => changeTheme('dark')}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              theme === 'dark'
+                                ? 'bg-zinc-950 text-indigo-400 shadow-sm'
+                                : 'text-zinc-500 hover:text-zinc-400'
+                            }`}
+                            title={t.themeDark}
+                          >
+                            <Moon className="w-4 h-4" />
+                          </button>
+
+                          {/* Eye Care Theme Button */}
+                          <button
+                            type="button"
+                            onClick={() => changeTheme('eye-care')}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              theme === 'eye-care'
+                                ? 'bg-[#7a644b] text-white shadow-sm'
+                                : 'text-[#90795e] hover:text-[#433422]'
+                            }`}
+                            title={t.themeEyeCare}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Connection & Update Status */}
+                  <div className={`p-5 rounded-2xl border ${
+                    theme === 'dark'
+                      ? 'bg-zinc-950/50 border-zinc-800/80'
+                      : theme === 'eye-care'
+                      ? 'bg-[#fcf8f2] border-[#e3d3b4]'
+                      : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <h3 className="text-xs font-black uppercase tracking-wider mb-3 text-slate-400 dark:text-zinc-500">
+                      {lang === 'ar' ? 'حالة النظام والتزامن' : 'System Status & Sync'}
+                    </h3>
+                    <div className="space-y-3">
+                      {/* Connection / Sync Button */}
+                      <button
+                        onClick={triggerDataSync}
+                        disabled={isSyncing || !isOnline}
+                        type="button"
+                        className={`w-full text-xs font-bold px-3 py-3 rounded-xl flex items-center justify-center gap-1.5 transition border ${
+                          isSyncing
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-900/40 dark:text-blue-400'
+                            : !isOnline
+                            ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-400'
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-900/40 dark:text-emerald-400 hover:bg-emerald-100/30 dark:hover:bg-emerald-950/30'
+                        } cursor-pointer shadow-sm`}
+                        title={
+                          !isOnline
+                            ? (lang === 'ar' ? 'أنت غير متصل بالإنترنت - يتم حفظ بياناتك محلياً بشكل آمن' : 'You are offline - your data is being saved locally and securely')
+                            : (lang === 'ar' ? 'اضغط للمزامنة اليدوية الفورية' : 'Click to trigger immediate manual sync')
+                        }
+                      >
+                        {isSyncing ? (
+                          <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                        ) : !isOnline ? (
+                          <WifiOff className="w-4 h-4 text-amber-500" />
+                        ) : (
+                          <Wifi className="w-4 h-4 text-emerald-500" />
+                        )}
+                        <span className="truncate">
+                          {isSyncing
+                            ? (lang === 'ar' ? 'جاري المزامنة...' : 'Syncing...')
+                            : !isOnline
+                            ? (lang === 'ar' ? 'وضع الأوفلاين' : 'Offline Mode')
+                            : (lang === 'ar' ? 'متصل ومزامن' : 'Online & Synced')}
+                        </span>
+                      </button>
+
+                      {/* Install PWA Desktop button */}
+                      {showInstallBtn && (
+                        <button
+                          onClick={handleInstallApp}
+                          type="button"
+                          className="w-full text-xs font-black px-3 py-3 rounded-xl border transition flex items-center justify-center gap-2 cursor-pointer shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <Download className="w-4 h-4 text-indigo-100 animate-bounce" />
+                          <span>{lang === 'ar' ? 'تثبيت كبرنامج للكمبيوتر' : 'Install Desktop App'}</span>
+                        </button>
+                      )}
+
+                      {/* Manual PWA Update status */}
+                      <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80">
+                        <div className="flex items-center gap-2 mb-2 text-xs font-bold text-slate-500 dark:text-zinc-400">
+                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{lang === 'ar' ? 'تحديثات النظام:' : 'System Updates:'}</span>
+                        </div>
+
+                        {needRefresh ? (
+                          <div className="space-y-3">
+                            <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl flex items-center gap-2.5">
+                              <AlertTriangle className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                                {lang === 'ar' ? 'يتوفر تحديث جديد وجاهز للتثبيت' : 'A new update is available and ready'}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                updateServiceWorker(true);
+                                setShowSidebar(false);
+                              }}
+                              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition cursor-pointer shadow-md flex items-center justify-center gap-2"
+                            >
+                              <span>{lang === 'ar' ? 'تثبيت التحديث الآن' : 'Install Update Now'}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>{lang === 'ar' ? 'أنت تستخدم أحدث إصدار من النظام' : 'Using latest system version'}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Time & Date Card */}
+                  <div className={`p-5 rounded-2xl border ${
+                    theme === 'dark'
+                      ? 'bg-zinc-950/50 border-zinc-800/80'
+                      : theme === 'eye-care'
+                      ? 'bg-[#fcf8f2] border-[#e3d3b4]'
+                      : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <h3 className="text-xs font-black uppercase tracking-wider mb-2 text-slate-400 dark:text-zinc-500">
+                      {lang === 'ar' ? 'الوقت والتاريخ الحالي' : 'Current Time & Date'}
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-zinc-300">
+                        <span>📅</span>
+                        <span>
+                          {currentTime.toLocaleDateString(
+                            lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US',
+                            { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-zinc-300">
+                        <span>⏰</span>
+                        <span className="font-mono" dir="ltr">
+                          {currentTime.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. App features list */}
+                  <div className={`p-5 rounded-2xl border ${
+                    theme === 'dark'
+                      ? 'bg-zinc-950/50 border-zinc-800/80'
+                      : theme === 'eye-care'
+                      ? 'bg-[#fcf8f2] border-[#e3d3b4]'
+                      : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <h3 className="text-sm font-black mb-2.5">
+                      {lang === 'ar' ? 'خصائص التطبيق' : 'Application Features'}
+                    </h3>
+                    <ul className="text-xs space-y-2 text-slate-600 dark:text-zinc-400 font-medium list-disc list-inside">
+                      <li>{lang === 'ar' ? 'يعمل بدون إنترنت بالكامل (Offline-First)' : 'Fully offline capable (Offline-First)'}</li>
+                      <li>{lang === 'ar' ? 'حفظ البيانات محلياً بشكل آمن وتلقائي' : 'Automatic secure local storage'}</li>
+                      <li>{lang === 'ar' ? 'قابل للتثبيت كبرنامج مستقل (PWA)' : 'Installable as a standalone app (PWA)'}</li>
+                      <li>{lang === 'ar' ? 'حماية تامة للبيانات والخصوصية' : 'Complete data privacy protection'}</li>
+                    </ul>
+                  </div>
+
+                  {/* 5. Clear Database Button */}
+                  <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                    <button
+                      onClick={() => {
+                        setShowClearConfirm(true);
+                        setShowSidebar(false);
+                      }}
+                      type="button"
+                      className="w-full text-xs font-bold text-rose-500 hover:text-rose-700 flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 px-3.5 py-3 rounded-xl transition border border-rose-100 dark:border-rose-900/40 cursor-pointer shadow-sm hover:shadow-md"
+                      title={t.resetDataBtn}
+                    >
+                      <span>⚠️</span>
+                      <span>{t.resetDataBtn}</span>
+                    </button>
+                  </div>
+
+                  {/* 6. Dev / Supervisor Card */}
+                  <div className={`p-5 rounded-2xl border text-center ${
+                    theme === 'dark'
+                      ? 'bg-zinc-950/50 border-zinc-800/80'
+                      : theme === 'eye-care'
+                      ? 'bg-[#fcf8f2] border-[#e3d3b4]'
+                      : 'bg-indigo-50/40 border-indigo-100'
+                  }`}>
+                    <p className={`text-[10px] font-black tracking-widest uppercase mb-1.5 ${
+                      theme === 'dark' ? 'text-indigo-400' : theme === 'eye-care' ? 'text-[#845e35]' : 'text-indigo-600'
+                    }`}>
+                      ✨ {lang === 'ar' ? 'الإشراف والتطوير' : 'Supervision & Development'} ✨
+                    </p>
+                    <h3 className="text-sm font-extrabold mb-1">
+                      {lang === 'ar' ? 'محمد شيباني' : 'Mohamed Shibani'}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold leading-normal">
+                      {lang === 'ar' ? 'تطوير وإشراف: محمد شيباني (Mohamed Shibani)' : 'Developed & Supervised by: Mohamed Shibani'}
+                    </p>
+                  </div>
+
+                </div>
+
+                {/* Drawer Footer */}
+                <div className="px-6 py-5 border-t border-zinc-100 dark:border-zinc-800/60 text-center">
+                  <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
+                    © {new Date().getFullYear()} {t.appName}. {lang === 'ar' ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
+                  </p>
+                </div>
+
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Custom Confirmation Modal for resetting the database */}
       {showClearConfirm && (
