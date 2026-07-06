@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { flushSync } from 'react-dom';
-import { Product, Transaction, CartItem, Expense } from './types';
+import { Product, Transaction, CartItem, Expense, Requirement } from './types';
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import Inventory from './components/Inventory';
 import TransactionHistory from './components/TransactionHistory';
 import Expenses from './components/Expenses';
+import Requirements from './components/Requirements';
 import VirtualKeyboard from './components/VirtualKeyboard';
-import { LayoutDashboard, ShoppingCart, Package, History, Calculator, HelpCircle, Layers, Globe, Sun, Moon, Eye, Wifi, WifiOff, Download, RefreshCw, AlertTriangle, Menu, X, Info, TrendingDown, Keyboard } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, History, Calculator, HelpCircle, Layers, Globe, Sun, Moon, Eye, Wifi, WifiOff, Download, RefreshCw, AlertTriangle, Menu, X, Info, TrendingDown, Keyboard, ClipboardList } from 'lucide-react';
 import { translations } from './translations';
 import { pwaDb } from './db/pwaDb';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,7 +19,8 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'history' | 'expenses'>('dashboard');
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'history' | 'expenses' | 'requirements'>('dashboard');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -284,11 +286,17 @@ export default function App() {
         setProducts(dbProducts);
         setTransactions(dbTransactions);
         setExpenses(dbExpenses);
+
+        const savedReqs = localStorage.getItem('accounting_requirements');
+        if (savedReqs) {
+          try { setRequirements(JSON.parse(savedReqs)); } catch (e) {}
+        }
       } catch (error) {
         console.error("Failed to load data from IndexedDB, falling back to LocalStorage:", error);
         const savedProducts = localStorage.getItem('accounting_products');
         const savedTransactions = localStorage.getItem('accounting_transactions');
         const savedExpenses = localStorage.getItem('accounting_expenses');
+        const savedReqs = localStorage.getItem('accounting_requirements');
         if (savedProducts) {
           try { setProducts(JSON.parse(savedProducts)); } catch(e){}
         }
@@ -297,6 +305,9 @@ export default function App() {
         }
         if (savedExpenses) {
           try { setExpenses(JSON.parse(savedExpenses)); } catch(e){}
+        }
+        if (savedReqs) {
+          try { setRequirements(JSON.parse(savedReqs)); } catch(e){}
         }
       }
     };
@@ -369,7 +380,15 @@ export default function App() {
   };
 
   // Add Transaction (POS checkout) and deduct stock quantities
-  const handleAddTransaction = (customerName: string, cartItems: CartItem[], notes: string): Transaction => {
+  const handleAddTransaction = (
+    customerName: string, 
+    cartItems: CartItem[], 
+    notes: string,
+    isDelivery?: boolean,
+    deliveryDriver?: string,
+    deliveryFee?: number,
+    deliveryAddress?: string
+  ): Transaction => {
     let totalAmount = 0;
     let totalCost = 0;
 
@@ -415,6 +434,11 @@ export default function App() {
       totalProfit: totalAmount - totalCost,
       date: new Date().toISOString(),
       notes: notes,
+      isDelivery: isDelivery,
+      deliveryDriver: deliveryDriver,
+      deliveryFee: deliveryFee,
+      deliveryStatus: isDelivery ? 'pending' : undefined,
+      deliveryAddress: deliveryAddress,
     };
 
     // Deduct stock quantities from inventory
@@ -529,6 +553,27 @@ export default function App() {
     saveExpenses(updated);
   };
 
+  // --- REQUIREMENTS PERSISTENCE ---
+  const saveRequirements = (updatedRequirements: Requirement[]) => {
+    setRequirements(updatedRequirements);
+    localStorage.setItem('accounting_requirements', JSON.stringify(updatedRequirements));
+  };
+
+  const handleAddRequirement = (newReq: Requirement) => {
+    const updated = [newReq, ...requirements];
+    saveRequirements(updated);
+  };
+
+  const handleUpdateRequirement = (updatedReq: Requirement) => {
+    const updated = requirements.map((r) => (r.id === updatedReq.id ? updatedReq : r));
+    saveRequirements(updated);
+  };
+
+  const handleDeleteRequirement = (id: string) => {
+    const updated = requirements.filter((r) => r.id !== id);
+    saveRequirements(updated);
+  };
+
   // --- GENERAL ACCOUNTING ESTIMATES (Asset Evaluation) ---
   const stockSummary = useMemo(() => {
     let totalAssetCost = 0;
@@ -557,9 +602,11 @@ export default function App() {
     setProducts([]);
     setTransactions([]);
     setExpenses([]);
+    setRequirements([]);
     localStorage.setItem('accounting_products', JSON.stringify([]));
     localStorage.setItem('accounting_transactions', JSON.stringify([]));
     localStorage.setItem('accounting_expenses', JSON.stringify([]));
+    localStorage.setItem('accounting_requirements', JSON.stringify([]));
     try {
       await pwaDb.clearAll();
     } catch (e) {
@@ -870,6 +917,28 @@ export default function App() {
               <span>{t.tabExpenses}</span>
             </button>
 
+            {/* Tab 6: Requirements */}
+            <button
+              onClick={() => setActiveTab('requirements')}
+              className={`py-4 px-1 border-b-2 font-bold text-sm flex items-center gap-2 transition cursor-pointer ${
+                activeTab === 'requirements'
+                  ? theme === 'dark'
+                    ? 'border-indigo-400 text-indigo-400'
+                    : theme === 'eye-care'
+                    ? 'border-amber-900 text-amber-950'
+                    : 'border-indigo-600 text-indigo-600'
+                  : theme === 'dark'
+                  ? 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  : theme === 'eye-care'
+                  ? 'border-transparent text-[#90795e] hover:text-[#433422]'
+                  : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'
+              }`}
+              id="requirements_tab_button"
+            >
+              <ClipboardList className="w-4.5 h-4.5" />
+              <span>{t.tabRequirements}</span>
+            </button>
+
           </nav>
         </div>
       </div>
@@ -928,6 +997,20 @@ export default function App() {
             onAddExpense={handleAddExpense}
             onEditExpense={handleEditExpense}
             onDeleteExpense={handleDeleteExpense}
+            lang={lang}
+            theme={theme}
+          />
+        </div>
+
+        <div className={activeTab === 'requirements' ? 'block' : 'hidden'}>
+          <Requirements
+            requirements={requirements}
+            products={products}
+            onAddRequirement={handleAddRequirement}
+            onUpdateRequirement={handleUpdateRequirement}
+            onDeleteRequirement={handleDeleteRequirement}
+            onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
             lang={lang}
             theme={theme}
           />
@@ -1478,6 +1561,26 @@ export default function App() {
               <span>{printActiveTransaction.notes}</span>
             </div>
           )}
+          {printActiveTransaction.isDelivery && (
+            <>
+              <div className="flex justify-between font-bold text-indigo-800">
+                <span>{lang === 'ar' ? 'نوع الطلب:' : 'Order Type:'}</span>
+                <span>{lang === 'ar' ? '🛵 دليفري (توصيل منزلي)' : '🛵 Delivery'}</span>
+              </div>
+              {printActiveTransaction.deliveryDriver && (
+                <div className="flex justify-between">
+                  <span className="font-bold">{lang === 'ar' ? 'المندوب:' : 'Driver:'}</span>
+                  <span>{printActiveTransaction.deliveryDriver}</span>
+                </div>
+              )}
+              {printActiveTransaction.deliveryAddress && (
+                <div className="flex justify-between">
+                  <span className="font-bold">{lang === 'ar' ? 'العنوان / الهاتف:' : 'Address / Tel:'}</span>
+                  <span>{printActiveTransaction.deliveryAddress}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <div className="border-b border-dashed border-black my-2"></div>
@@ -1510,10 +1613,26 @@ export default function App() {
 
         {/* Totals Summary */}
         <div className="space-y-1 text-black">
-          <div className="flex justify-between items-center text-xs font-black py-0.5">
-            <span>{lang === 'ar' ? 'الإجمالي الكلي:' : 'Grand Total:'}</span>
+          {printActiveTransaction.isDelivery && (
+            <div className="flex justify-between items-center text-[10px] py-0.5">
+              <span>{lang === 'ar' ? 'إجمالي المواد:' : 'Items Subtotal:'}</span>
+              <span className="font-mono">
+                {printActiveTransaction.totalAmount.toLocaleString()} {t.currency}
+              </span>
+            </div>
+          )}
+          {printActiveTransaction.isDelivery && printActiveTransaction.deliveryFee !== undefined && (
+            <div className="flex justify-between items-center text-[10px] py-0.5 font-bold text-indigo-900">
+              <span>{lang === 'ar' ? 'رسوم التوصيل:' : 'Delivery Fee:'}</span>
+              <span className="font-mono">
+                {(printActiveTransaction.deliveryFee || 0).toLocaleString()} {t.currency}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between items-center text-xs font-black py-0.5 border-t border-dashed border-black pt-1">
+            <span>{lang === 'ar' ? 'الإجمالي النهائي للطلب:' : 'Grand Total:'}</span>
             <span className="font-mono text-sm">
-              {printActiveTransaction.totalAmount.toLocaleString()} {t.currency}
+              {(printActiveTransaction.totalAmount + (printActiveTransaction.isDelivery && printActiveTransaction.deliveryFee ? printActiveTransaction.deliveryFee : 0)).toLocaleString()} {t.currency}
             </span>
           </div>
           {printReceivedAmount > 0 && (
@@ -1524,12 +1643,12 @@ export default function App() {
               </div>
               <div className="flex justify-between items-center text-[10px] py-0.5">
                 <span>
-                  {printReceivedAmount >= printActiveTransaction.totalAmount
+                  {printReceivedAmount >= (printActiveTransaction.totalAmount + (printActiveTransaction.isDelivery && printActiveTransaction.deliveryFee ? printActiveTransaction.deliveryFee : 0))
                     ? (lang === 'ar' ? 'المبلغ المرتجع (الباقي):' : 'Change Due:')
                     : (lang === 'ar' ? 'المتبقي (عجز):' : 'Remaining:')}
                 </span>
                 <span className="font-mono font-bold">
-                  {Math.abs(printReceivedAmount - printActiveTransaction.totalAmount).toLocaleString()} {t.currency}
+                  {Math.abs(printReceivedAmount - (printActiveTransaction.totalAmount + (printActiveTransaction.isDelivery && printActiveTransaction.deliveryFee ? printActiveTransaction.deliveryFee : 0))).toLocaleString()} {t.currency}
                 </span>
               </div>
             </>

@@ -222,7 +222,7 @@ export default function Dashboard({ transactions, products, expenses, lang, them
           </div>
           <div className={`mt-4 flex items-center text-xs ${textTertiaryClass}`}>
             <span className="text-slate-500 dark:text-slate-400 font-medium mx-1">
-              {t.posCostShort}
+              {lang === 'ar' ? 'رأس المال' : 'Capital'}
             </span>
             {t.dashCostDesc}
           </div>
@@ -263,7 +263,7 @@ export default function Dashboard({ transactions, products, expenses, lang, them
               </h3>
             </div>
             <div className="bg-emerald-50 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 p-3.5 rounded-xl group-hover:scale-110 transition-transform">
-              <TrendingUp className="w-6 h-6" />
+              {stats.totalProfit >= 0 ? <TrendingUp className="w-6 h-6 text-emerald-600" /> : <TrendingDown className="w-6 h-6 text-rose-600" />}
             </div>
           </div>
           <div className={`mt-4 flex items-center text-xs ${textTertiaryClass}`}>
@@ -276,21 +276,21 @@ export default function Dashboard({ transactions, products, expenses, lang, them
 
         {/* Card 4: Profit Margin */}
         <div className={`rounded-2xl p-6 border shadow-sm transition hover:shadow-md relative overflow-hidden group ${cardBgClass}`}>
-          <div className="absolute top-0 right-0 left-0 h-1.5 w-full bg-indigo-500"></div>
+          <div className="absolute top-0 right-0 left-0 h-1.5 w-full bg-sky-500"></div>
           <div className="flex justify-between items-center">
             <div>
               <p className={`text-sm font-medium mb-1 ${textSecondaryClass}`}>{t.dashMarginTitle}</p>
               <h3 className={`text-3xl font-bold tracking-tight ${textPrimaryClass}`}>
-                {stats.profitMargin.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} <span className="text-sm font-semibold text-indigo-500">%</span>
+                {stats.profitMargin.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} <span className="text-sm font-semibold text-sky-500">%</span>
               </h3>
             </div>
-            <div className="bg-indigo-50 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 p-3.5 rounded-xl group-hover:scale-110 transition-transform">
+            <div className="bg-sky-50 dark:bg-zinc-800 text-sky-650 dark:text-sky-400 p-3.5 rounded-xl group-hover:scale-110 transition-transform">
               <Percent className="w-6 h-6" />
             </div>
           </div>
           <div className={`mt-4 flex items-center text-xs ${textTertiaryClass}`}>
-            <span className="text-indigo-600 dark:text-indigo-400 font-medium mx-1">
-              {t.posProfitRate}
+            <span className="text-sky-600 dark:text-sky-400 font-medium mx-1">
+              {lang === 'ar' ? 'بمعدل ربح' : 'Profit rate'}
             </span>
             {t.dashMarginDesc}
           </div>
@@ -341,7 +341,7 @@ export default function Dashboard({ transactions, products, expenses, lang, them
                 
                 // Calculate height of bars based on maxChartValue
                 const salesHeight = (day.sales / maxChartValue) * 200;
-                const profitHeight = (day.profit / maxChartValue) * 200;
+                const profitHeight = (Math.max(0, day.profit) / maxChartValue) * 200;
 
                 // Max heights to prevent overflow
                 const sHeight = Math.min(salesHeight, 200);
@@ -455,10 +455,10 @@ export default function Dashboard({ transactions, products, expenses, lang, them
             )}
           </div>
 
-          {/* Most Profitable products */}
+          {/* Top profitable list */}
           <div className={`rounded-2xl p-6 border shadow-sm ${cardBgClass}`}>
             <div className={`flex items-center gap-2 mb-4 ${lang === 'ar' ? 'flex-row' : 'flex-row'}`}>
-              <div className="p-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-lg">
+              <div className="p-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-lg">
                 <Award className="w-5 h-5" />
               </div>
               <h3 className={`text-md font-bold ${textPrimaryClass}`}>{t.dashTopByProfit}</h3>
@@ -472,11 +472,11 @@ export default function Dashboard({ transactions, products, expenses, lang, them
               <div className="space-y-3.5">
                 {topProducts.byProfit.map((item, idx) => (
                   <div key={item.name} className={`flex items-center justify-between p-2.5 rounded-xl transition ${
-                    theme === 'dark' ? 'hover:bg-zinc-800/50' : theme === 'eye-care' ? 'hover:bg-[#f3e5ca]/50' : 'hover:bg-slate-50'
+                    theme === 'dark' ? 'hover:bg-zinc-800/50' : theme === 'eye-care' ? 'hover:bg-[#f3e5ca]/50' : 'hover:bg-[#faf2e4]/50'
                   }`}>
                     <div className="flex items-center gap-3">
                       <span className={`flex items-center justify-center w-6 h-6 rounded-full font-bold text-xs ${
-                        theme === 'dark' ? 'bg-blue-950 text-blue-400' : theme === 'eye-care' ? 'bg-[#dfca9e] text-amber-900' : 'bg-blue-50 text-blue-600'
+                        theme === 'dark' ? 'bg-zinc-800 text-zinc-400' : theme === 'eye-care' ? 'bg-[#ebdcc3] text-[#433422]' : 'bg-slate-100 text-slate-500'
                       }`}>
                         {idx + 1}
                       </span>
@@ -485,14 +485,16 @@ export default function Dashboard({ transactions, products, expenses, lang, them
                       </span>
                     </div>
                     <div className={`${lang === 'ar' ? 'text-left' : 'text-right'}`}>
-                      <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">+{item.profit.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</div>
-                      <div className={`text-[10px] ${textSecondaryClass}`}>{lang === 'ar' ? `من إجمالي ${item.quantity} مبيعات` : `from ${item.quantity} sales`}</div>
+                      <div className={`text-sm font-bold text-emerald-600 dark:text-emerald-400`}>+{item.profit.toFixed(1)} {t.currency}</div>
+                      <div className={`text-[10px] ${textSecondaryClass}`}>{item.quantity} {t.dashUnit}</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+
 
         </div>
 

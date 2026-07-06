@@ -299,7 +299,7 @@ export default function TransactionHistory({ transactions, products, onDeleteTra
 
         <div>
           <p className={`${theme === 'eye-care' ? 'text-[#786144]' : 'text-slate-400'} text-xs font-semibold mb-1`}>{lang === 'ar' ? 'مبيعات الفترة' : 'Sales Period'}</p>
-          <div className="text-2xl font-bold text-emerald-400 dark:text-emerald-300 tracking-tight">
+          <div className="text-2xl font-bold text-indigo-400 dark:text-indigo-300 tracking-tight">
             {filteredTotals.sales.toLocaleString(localeCode, { maximumFractionDigits: 1 })} <span className={`text-xs ${theme === 'eye-care' ? 'text-[#786144]' : 'text-slate-400'}`}>{t.currency}</span>
           </div>
         </div>
@@ -358,6 +358,12 @@ export default function TransactionHistory({ transactions, products, onDeleteTra
                               {lang === 'ar' ? `طلب #${tx.orderNumber}` : `Order #${tx.orderNumber}`}
                             </span>
                           )}
+                          {tx.isDelivery && (
+                            <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full select-none flex items-center gap-1 shadow-sm">
+                              <span>🛵 {lang === 'ar' ? 'دليفري' : 'Delivery'}</span>
+                              {tx.deliveryDriver && <span className="opacity-90">({tx.deliveryDriver})</span>}
+                            </span>
+                          )}
                           <h4 className={`font-bold text-sm sm:text-base ${textPrimaryClass}`}>{tx.customerName}</h4>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                             theme === 'dark' ? 'bg-zinc-850 text-zinc-400' : theme === 'eye-care' ? 'bg-[#ebdcc3] text-[#433422]' : 'bg-slate-100 text-slate-500'
@@ -390,6 +396,8 @@ export default function TransactionHistory({ transactions, products, onDeleteTra
                           {tx.totalProfit >= 0 ? '+' : ''}{tx.totalProfit.toLocaleString(localeCode, { maximumFractionDigits: 1 })} {t.currency}
                         </div>
                       </div>
+
+
 
                       {/* Expand / delete buttons */}
                       <div className="flex items-center gap-2">
@@ -458,13 +466,38 @@ export default function TransactionHistory({ transactions, products, onDeleteTra
                         })}
                       </div>
 
+                      {tx.isDelivery && (
+                        <div className={`p-3 rounded-lg border text-xs space-y-1.5 ${
+                          theme === 'dark' ? 'bg-zinc-950/40 border-zinc-850' : theme === 'eye-care' ? 'bg-[#ebdcc3]/30 border-[#dfca9e]' : 'bg-indigo-50/30 border-indigo-100/60'
+                        }`}>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400 dark:text-zinc-500">{lang === 'ar' ? 'سعر المواد:' : 'Products Subtotal:'}</span>
+                            <span className={`font-semibold ${textPrimaryClass}`}>{tx.totalAmount.toLocaleString(localeCode)} {t.currency}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">{lang === 'ar' ? 'تكلفة التوصيل الدليفري:' : 'Delivery Fee:'}</span>
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{(tx.deliveryFee || 0).toLocaleString(localeCode)} {t.currency}</span>
+                          </div>
+                          {tx.deliveryAddress && (
+                            <div className="flex justify-between items-start text-[11px] gap-2 border-t border-dashed border-slate-200/55 pt-1.5 mt-1.5">
+                              <span className="text-slate-400 dark:text-zinc-500 shrink-0">{lang === 'ar' ? 'العنوان وتفاصيل الاتصال للتوصيل:' : 'Delivery Address & Contact:'}</span>
+                              <span className={`font-medium ${textPrimaryClass} text-left break-all`}>{tx.deliveryAddress}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className={`pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                         theme === 'dark' ? 'border-zinc-800' : theme === 'eye-care' ? 'border-[#dfca9e]' : 'border-slate-200'
                       }`}>
                         <div className={`flex flex-wrap gap-4 text-[11px] font-bold ${
                           theme === 'dark' ? 'text-zinc-300' : theme === 'eye-care' ? 'text-[#433422]' : 'text-slate-500'
                         }`}>
-                          <span>{t.posTotalAmount}: {tx.totalAmount.toLocaleString(localeCode, { maximumFractionDigits: 1 })} {t.currency}</span>
+                          <span>
+                            {tx.isDelivery ? (lang === 'ar' ? 'إجمالي الطلب الكلي:' : 'Grand Total:') : t.posTotalAmount}:{' '}
+                            {(tx.totalAmount + (tx.isDelivery && tx.deliveryFee ? tx.deliveryFee : 0)).toLocaleString(localeCode, { maximumFractionDigits: 1 })}{' '}
+                            {t.currency}
+                          </span>
                           <span>{t.posTotalCost}: {tx.totalCost.toLocaleString(localeCode, { maximumFractionDigits: 1 })} {t.currency}</span>
                           <span className="text-emerald-600 dark:text-emerald-400">{t.posNetProfit}: {tx.totalProfit.toLocaleString(localeCode, { maximumFractionDigits: 1 })} {t.currency}</span>
                         </div>
@@ -810,7 +843,7 @@ export default function TransactionHistory({ transactions, products, onDeleteTra
                   const margin = totalAmount > 0 ? (totalProfit / totalAmount) * 100 : 0;
 
                   return (
-                    <div className={`p-4 rounded-xl border grid grid-cols-3 gap-4 text-center mt-3 ${
+                    <div className={`p-4 rounded-xl border grid grid-cols-1 sm:grid-cols-3 gap-4 text-center mt-3 ${
                       theme === 'dark' ? 'bg-zinc-950 border-zinc-850' : theme === 'eye-care' ? 'bg-[#ebdcc3] border-[#dfca9e]' : 'bg-slate-100 border-slate-200'
                     }`}>
                       <div>
@@ -818,14 +851,13 @@ export default function TransactionHistory({ transactions, products, onDeleteTra
                         <span className={`text-sm font-extrabold ${textPrimaryClass}`}>{totalAmount.toLocaleString()} {t.currency}</span>
                       </div>
                       <div>
-                        <span className={`text-[10px] block font-bold ${textSecondaryClass}`}>{lang === 'ar' ? 'إجمالي التكلفة الجديد' : 'New Cost Total'}</span>
-                        <span className={`text-sm font-bold ${textPrimaryClass}`}>{totalCost.toLocaleString()} {t.currency}</span>
+                        <span className={`text-[10px] block font-bold ${textSecondaryClass}`}>{lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost'}</span>
+                        <span className={`text-sm font-bold text-amber-500`}>{totalCost.toLocaleString()} {t.currency}</span>
                       </div>
                       <div>
-                        <span className={`text-[10px] block font-bold ${textSecondaryClass}`}>{lang === 'ar' ? 'صافي الربح المعدل' : 'Adjusted Profit'}</span>
-                        <span className={`text-sm font-extrabold block ${totalProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {totalProfit >= 0 ? '+' : ''}{totalProfit.toLocaleString()} {t.currency}
-                          <span className="text-[9px] font-bold block opacity-75">({margin.toFixed(0)}% هامش)</span>
+                        <span className={`text-[10px] block font-bold ${textSecondaryClass}`}>{lang === 'ar' ? 'صافي الربح / الهامش' : 'Net Profit / Margin'}</span>
+                        <span className={`text-sm font-extrabold ${totalProfit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {totalProfit >= 0 ? '+' : ''}{totalProfit.toLocaleString()} {t.currency} ({margin.toFixed(0)}%)
                         </span>
                       </div>
                     </div>

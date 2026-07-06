@@ -5,7 +5,15 @@ import { translations } from '../translations';
 
 interface POSProps {
   products: Product[];
-  onAddTransaction: (customerName: string, items: CartItem[], notes: string) => Transaction;
+  onAddTransaction: (
+    customerName: string,
+    items: CartItem[],
+    notes: string,
+    isDelivery?: boolean,
+    deliveryDriver?: string,
+    deliveryFee?: number,
+    deliveryAddress?: string
+  ) => Transaction;
   onPrintTransaction: (tx: Transaction, received: number) => void;
   lang: 'ar' | 'en';
   theme: 'light' | 'dark' | 'eye-care';
@@ -17,6 +25,11 @@ interface HeldOrder {
   cart: CartItem[];
   notes: string;
   heldAt: string;
+  isDelivery?: boolean;
+  deliveryDriver?: string;
+  deliveryFee?: number;
+  deliveryAddress?: string;
+  isPaid?: boolean;
 }
 
 export default function POS({ products, onAddTransaction, onPrintTransaction, lang, theme }: POSProps) {
@@ -29,6 +42,13 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
   const [errorMessage, setErrorMessage] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [receivedAmount, setReceivedAmount] = useState('');
+
+  // Delivery states
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [deliveryDriver, setDeliveryDriver] = useState(lang === 'ar' ? 'عام' : 'General');
+  const [deliveryFee, setDeliveryFee] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [isPaid, setIsPaid] = useState(false);
 
   // Interactive printable invoice receipt modal state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -164,7 +184,16 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
     }
 
     const clientName = customerName.trim() || (lang === 'ar' ? 'زبون عام' : 'General Customer');
-    const newTx = onAddTransaction(clientName, cart, notes);
+    const fee = isDelivery && deliveryFee ? parseFloat(deliveryFee) : 0;
+    const newTx = onAddTransaction(
+      clientName,
+      cart,
+      notes,
+      isDelivery,
+      isDelivery ? deliveryDriver : undefined,
+      isDelivery ? fee : undefined,
+      isDelivery ? deliveryAddress : undefined
+    );
     
     // Save context for immediate post-sale receipt & print popup
     setLastCompletedTx(newTx);
@@ -178,6 +207,11 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
     setSearchQuery('');
     setErrorMessage('');
     setReceivedAmount('');
+    setIsDelivery(false);
+    setDeliveryDriver(lang === 'ar' ? 'عام' : 'General');
+    setDeliveryFee('');
+    setDeliveryAddress('');
+    setIsPaid(false);
     
     // Show feedback
     setShowSuccessToast(true);
@@ -189,12 +223,27 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
     if (cart.length === 0) return;
     
     const clientName = customerName.trim() || (lang === 'ar' ? `طلب معلّق` : `Suspended Order`);
+    
+    // Add Delivery info to the notes comment so it explicitly says it is delivery there too
+    let finalNotes = notes.trim();
+    if (isDelivery) {
+      const deliverySuffix = lang === 'ar' 
+        ? `[🚚 طلب دليفري - المندوب: ${deliveryDriver}${deliveryFee ? ` - التكلفة: ${deliveryFee} ل.س` : ''}${deliveryAddress ? ` - العنوان: ${deliveryAddress}` : ''}]`
+        : `[🚚 Delivery Order - Driver: ${deliveryDriver}${deliveryFee ? ` - Fee: ${deliveryFee}` : ''}${deliveryAddress ? ` - Address: ${deliveryAddress}` : ''}]`;
+      finalNotes = finalNotes ? `${finalNotes} | ${deliverySuffix}` : deliverySuffix;
+    }
+
     const newHeld: HeldOrder = {
       id: `held-${Date.now()}`,
       customerName: clientName,
       cart: [...cart],
-      notes: notes,
+      notes: finalNotes,
       heldAt: new Date().toISOString(),
+      isDelivery: isDelivery,
+      deliveryDriver: isDelivery ? deliveryDriver : undefined,
+      deliveryFee: isDelivery && deliveryFee ? parseFloat(deliveryFee) || 0 : undefined,
+      deliveryAddress: isDelivery ? deliveryAddress : undefined,
+      isPaid: isPaid,
     };
     
     const updated = [newHeld, ...heldOrders];
@@ -207,6 +256,11 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
     setNotes('');
     setReceivedAmount('');
     setErrorMessage('');
+    setIsDelivery(false);
+    setDeliveryDriver(lang === 'ar' ? 'عام' : 'General');
+    setDeliveryFee('');
+    setDeliveryAddress('');
+    setIsPaid(false);
     
     // Show success toast
     setShowHoldSuccessToast(true);
@@ -231,8 +285,31 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
     if (held.customerName !== (lang === 'ar' ? 'طلب معلّق' : 'Suspended Order')) {
       setCustomerName(held.customerName);
     }
-    if (held.notes) {
-      setNotes(held.notes);
+    
+    // Extract original notes if they contain our auto-generated suffix
+    let originalNotes = held.notes || '';
+    const suffixRegexAr = /\s*\|\s*\[🚚 طلب دليفري - .*\]$/;
+    const suffixRegexEn = /\s*\|\s*\[🚚 Delivery Order - .*\]$/;
+    const pureSuffixRegexAr = /^\[🚚 طلب دليفري - .*\]$/;
+    const pureSuffixRegexEn = /^\[🚚 Delivery Order - .*\]$/;
+    
+    originalNotes = originalNotes.replace(suffixRegexAr, '').replace(suffixRegexEn, '');
+    if (pureSuffixRegexAr.test(originalNotes) || pureSuffixRegexEn.test(originalNotes)) {
+      originalNotes = '';
+    }
+    setNotes(originalNotes);
+    
+    // Restore delivery & payment status
+    setIsPaid(held.isPaid || false);
+    setIsDelivery(held.isDelivery || false);
+    if (held.isDelivery) {
+      if (held.deliveryDriver) setDeliveryDriver(held.deliveryDriver);
+      if (held.deliveryFee !== undefined) setDeliveryFee(held.deliveryFee.toString());
+      if (held.deliveryAddress) setDeliveryAddress(held.deliveryAddress);
+    } else {
+      setDeliveryDriver(lang === 'ar' ? 'عام' : 'General');
+      setDeliveryFee('');
+      setDeliveryAddress('');
     }
 
     // Remove from held list
@@ -306,6 +383,9 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
       : theme === 'eye-care' 
       ? 'bg-[#f0deb9]' 
       : 'bg-slate-50';
+
+  const feeNumber = isDelivery && deliveryFee ? parseFloat(deliveryFee) || 0 : 0;
+  const grandTotal = totals.totalSale + feeNumber;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in relative">
@@ -575,40 +655,173 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
           </div>
 
           {/* Customer Metadata Input */}
-          <div className={`p-5 border-t divide-y divide-transparent space-y-3 ${totalsBgClass} ${
+          <div className={`p-5 border-t space-y-3.5 ${totalsBgClass} ${
             theme === 'dark' ? 'border-zinc-800' : theme === 'eye-care' ? 'border-[#dfca9e]' : 'border-slate-100'
           }`}>
-            <div>
-              <label className={`block text-xs font-bold mb-1.5 flex items-center gap-1 ${textSecondaryClass}`}>
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                {t.posCustomerName}
-              </label>
-              <input
-                type="text"
-                placeholder={t.posCustomerNamePlaceholder}
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
-                  theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
-                }`}
-                id="customer_name_input"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={`block text-xs font-bold mb-1.5 flex items-center gap-1 ${textSecondaryClass}`}>
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  {t.posCustomerName}
+                </label>
+                <input
+                  type="text"
+                  placeholder={t.posCustomerNamePlaceholder}
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
+                    theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
+                  id="customer_name_input"
+                />
+              </div>
+
+              <div>
+                <label className={`block text-xs font-bold mb-1.5 ${textSecondaryClass}`}>
+                  {t.posNotes}
+                </label>
+                <input
+                  type="text"
+                  placeholder={t.posNotesPlaceholder}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
+                    theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
+                  id="invoice_notes_input"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className={`block text-xs font-bold mb-1.5 ${textSecondaryClass}`}>
-                {t.posNotes}
+            {/* Order Type / Delivery Selector */}
+            <div className="pt-2 border-t border-dashed border-slate-300/40">
+              <label className={`block text-xs font-bold mb-2 ${textSecondaryClass}`}>
+                {lang === 'ar' ? '🚚 طريقة استلام الطلب:' : '🚚 Order Delivery Mode:'}
               </label>
-              <input
-                type="text"
-                placeholder={t.posNotesPlaceholder}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
-                  theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
-                }`}
-                id="invoice_notes_input"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDelivery(false)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
+                    !isDelivery
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : theme === 'dark'
+                      ? 'bg-zinc-800 text-zinc-400 border border-zinc-750 hover:bg-zinc-750'
+                      : theme === 'eye-care'
+                      ? 'bg-[#eedcb8] text-[#8e7a63] border border-[#e3d3b4] hover:bg-[#ebdcc3]'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{lang === 'ar' ? '🛒 في الصالة / تيك أواي' : '🛒 In-Store / Takeaway'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDelivery(true)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isDelivery
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : theme === 'dark'
+                      ? 'bg-zinc-800 text-zinc-400 border border-zinc-750 hover:bg-zinc-750'
+                      : theme === 'eye-care'
+                      ? 'bg-[#eedcb8] text-[#8e7a63] border border-[#e3d3b4] hover:bg-[#ebdcc3]'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{lang === 'ar' ? '🛵 توصيل منزلي (دليفري)' : '🛵 Home Delivery'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive Delivery Fields */}
+            {isDelivery && (
+              <div className="space-y-3 pt-3 border-t border-dashed border-slate-300/40 animate-fade-in">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[11px] font-bold mb-1.5 ${textSecondaryClass}`}>
+                      {lang === 'ar' ? '🛵 مندوب التوصيل:' : '🛵 Delivery Representative:'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={lang === 'ar' ? 'اكتب اسم المندوب...' : 'Type driver name...'}
+                      value={deliveryDriver}
+                      onChange={(e) => setDeliveryDriver(e.target.value)}
+                      className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
+                        theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[11px] font-bold mb-1.5 ${textSecondaryClass}`}>
+                      {lang === 'ar' ? '💵 تكلفة التوصيل (لـ .س):' : '💵 Delivery Fee:'}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder={lang === 'ar' ? 'مثال: 5000' : 'e.g. 5000'}
+                      value={deliveryFee}
+                      onChange={(e) => setDeliveryFee(e.target.value)}
+                      className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
+                        theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-bold mb-1.5 ${textSecondaryClass}`}>
+                    {lang === 'ar' ? '📍 عنوان وهاتف التوصيل المرتجع:' : '📍 Delivery Address & Phone:'}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={lang === 'ar' ? 'مثال: المزة، حارة الورد، هاتف: 093354...' : 'e.g. Damascus, Tel: 093354...'}
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    className={`w-full text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 ${
+                      theme === 'dark' ? 'bg-zinc-800 text-white border-zinc-700' : theme === 'eye-care' ? 'bg-[#faf5ea] text-[#433422] border-[#dfca9e]' : 'bg-white border-slate-200 text-slate-800'
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Payment Status Selector */}
+            <div className="pt-2.5 border-t border-dashed border-slate-300/40">
+              <label className={`block text-xs font-bold mb-2 flex items-center gap-1 ${textSecondaryClass}`}>
+                <span>💳 {lang === 'ar' ? 'حالة دفع الحساب للطلب الحالي:' : 'Order Payment Status:'}</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPaid(false)}
+                  className={`py-2 px-3 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
+                    !isPaid
+                      ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-700'
+                      : theme === 'dark'
+                      ? 'bg-zinc-800 text-zinc-400 border border-zinc-750 hover:bg-zinc-750 hover:text-zinc-200'
+                      : theme === 'eye-care'
+                      ? 'bg-[#eedcb8]/40 text-[#8e7a63] border border-[#e3d3b4] hover:bg-[#eedcb8]'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 hover:text-slate-800'
+                  }`}
+                >
+                  <span>❌ {lang === 'ar' ? 'غير مدفوع / ذمم' : 'Unpaid / Debt'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPaid(true)}
+                  className={`py-2 px-3 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isPaid
+                      ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700'
+                      : theme === 'dark'
+                      ? 'bg-zinc-800 text-zinc-400 border border-zinc-750 hover:bg-zinc-750 hover:text-zinc-200'
+                      : theme === 'eye-care'
+                      ? 'bg-[#eedcb8]/40 text-[#8e7a63] border border-[#e3d3b4] hover:bg-[#eedcb8]'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 hover:text-slate-800'
+                  }`}
+                >
+                  <span>✅ {lang === 'ar' ? 'مدفوع / خالص' : 'Paid'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -617,9 +830,24 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
             theme === 'dark' ? 'border-zinc-800' : theme === 'eye-care' ? 'border-[#dfca9e]' : 'border-slate-100'
           }`}>
             <div className={`flex justify-between text-xs ${textSecondaryClass}`}>
-              <span>{t.posTotalAmount}</span>
+              <span>{isDelivery ? (lang === 'ar' ? 'المجموع الفرعي (المنتجات):' : 'Products Subtotal:') : t.posTotalAmount}</span>
               <span className={`font-semibold ${textPrimaryClass}`}>{totals.totalSale.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</span>
             </div>
+
+            {isDelivery && (
+              <div className={`flex justify-between text-xs text-indigo-600 dark:text-indigo-400 font-bold`}>
+                <span>{lang === 'ar' ? '🛵 تكلفة التوصيل:' : '🛵 Delivery Fee:'}</span>
+                <span>{feeNumber.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</span>
+              </div>
+            )}
+
+            {isDelivery && (
+              <div className={`flex justify-between text-sm font-black border-t border-dashed pt-1.5 ${textPrimaryClass}`}>
+                <span>{lang === 'ar' ? '📊 الإجمالي الكلي للطلب:' : '📊 Grand Total:'}</span>
+                <span className="text-indigo-600 dark:text-indigo-400">{grandTotal.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</span>
+              </div>
+            )}
+
             <div className={`flex justify-between text-xs ${textTertiaryClass}`}>
               <span>{t.posTotalCost}</span>
               <span>{totals.totalCost.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</span>
@@ -640,6 +868,8 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
                 )}
               </div>
             </div>
+
+
 
             {/* Cash Calculator / Change Return */}
             {totals.totalSale > 0 && (
@@ -667,17 +897,17 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
 
                 {parseFloat(receivedAmount) > 0 && (
                   <div className={`flex justify-between items-center p-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${
-                    parseFloat(receivedAmount) >= totals.totalSale
+                    parseFloat(receivedAmount) >= grandTotal
                       ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40'
                       : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/40'
                   }`}>
                     <span>
-                      {parseFloat(receivedAmount) >= totals.totalSale
+                      {parseFloat(receivedAmount) >= grandTotal
                         ? (lang === 'ar' ? 'المبلغ المتبقي للإرجاع للزبون:' : 'Change to return to customer:')
                         : (lang === 'ar' ? 'المتبقي لإكمال الحساب (عجز):' : 'Remaining to pay:')}
                     </span>
                     <span className="text-sm font-extrabold">
-                      {Math.abs(parseFloat(receivedAmount) - totals.totalSale).toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}
+                      {Math.abs(parseFloat(receivedAmount) - grandTotal).toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}
                     </span>
                   </div>
                 )}
@@ -799,6 +1029,26 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
                       <span className="text-black">{lastCompletedTx.notes}</span>
                     </div>
                   )}
+                  {lastCompletedTx.isDelivery && (
+                    <>
+                      <div className="flex justify-between text-indigo-700 font-bold border-t border-dashed border-zinc-200 pt-1 mt-1">
+                        <span>{lang === 'ar' ? 'نوع الطلب:' : 'Order Type:'}</span>
+                        <span>{lang === 'ar' ? '🛵 توصيل منزلي' : '🛵 Delivery'}</span>
+                      </div>
+                      {lastCompletedTx.deliveryDriver && (
+                        <div className="flex justify-between">
+                          <span>{lang === 'ar' ? 'اسم مندوب الدليفري:' : 'Driver:'}</span>
+                          <span className="text-black font-extrabold">{lastCompletedTx.deliveryDriver}</span>
+                        </div>
+                      )}
+                      {lastCompletedTx.deliveryAddress && (
+                        <div className="flex justify-between">
+                          <span>{lang === 'ar' ? 'العنوان / الهاتف:' : 'Address / Tel:'}</span>
+                          <span className="text-black font-bold break-all max-w-[180px]">{lastCompletedTx.deliveryAddress}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="border-b border-dashed border-zinc-400 my-2"></div>
@@ -828,9 +1078,21 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
                 <div className="border-b border-dashed border-zinc-400 my-2"></div>
 
                 <div className="space-y-0.5 text-[9px]">
-                  <div className="flex justify-between font-extrabold text-black text-xs">
-                    <span>{lang === 'ar' ? 'الإجمالي الكلي:' : 'Grand Total:'}</span>
-                    <span className="font-mono">{lastCompletedTx.totalAmount.toLocaleString()} {t.currency}</span>
+                  {lastCompletedTx.isDelivery && (
+                    <div className="flex justify-between text-zinc-600">
+                      <span>{lang === 'ar' ? 'إجمالي المنتجات:' : 'Products Subtotal:'}</span>
+                      <span className="font-mono">{lastCompletedTx.totalAmount.toLocaleString()} {t.currency}</span>
+                    </div>
+                  )}
+                  {lastCompletedTx.isDelivery && lastCompletedTx.deliveryFee !== undefined && (
+                    <div className="flex justify-between text-indigo-700 font-semibold">
+                      <span>{lang === 'ar' ? 'رسوم التوصيل:' : 'Delivery Fee:'}</span>
+                      <span className="font-mono">{(lastCompletedTx.deliveryFee || 0).toLocaleString()} {t.currency}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-extrabold text-black text-xs border-t border-dashed border-zinc-200 pt-1 mt-1">
+                    <span>{lang === 'ar' ? 'الإجمالي النهائي للطلب:' : 'Grand Total:'}</span>
+                    <span className="font-mono">{(lastCompletedTx.totalAmount + (lastCompletedTx.isDelivery && lastCompletedTx.deliveryFee ? lastCompletedTx.deliveryFee : 0)).toLocaleString()} {t.currency}</span>
                   </div>
                   {lastReceivedAmount > 0 && (
                     <>
@@ -840,12 +1102,12 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
                       </div>
                       <div className="flex justify-between text-zinc-700 font-bold">
                         <span>
-                          {lastReceivedAmount >= lastCompletedTx.totalAmount
+                          {lastReceivedAmount >= (lastCompletedTx.totalAmount + (lastCompletedTx.isDelivery && lastCompletedTx.deliveryFee ? lastCompletedTx.deliveryFee : 0))
                             ? (lang === 'ar' ? 'الباقي للمرتجع:' : 'Change Due:')
                             : (lang === 'ar' ? 'المتبقي كعجز:' : 'Remaining:')}
                         </span>
                         <span className="font-mono text-black">
-                          {Math.abs(lastReceivedAmount - lastCompletedTx.totalAmount).toLocaleString()} {t.currency}
+                          {Math.abs(lastReceivedAmount - (lastCompletedTx.totalAmount + (lastCompletedTx.isDelivery && lastCompletedTx.deliveryFee ? lastCompletedTx.deliveryFee : 0))).toLocaleString()} {t.currency}
                         </span>
                       </div>
                     </>
@@ -943,6 +1205,9 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
                     day: 'numeric'
                   });
 
+                  const feeValue = held.isDelivery && held.deliveryFee ? held.deliveryFee : 0;
+                  const totalFinal = totalSum + feeValue;
+
                   return (
                     <div 
                       key={held.id}
@@ -961,13 +1226,39 @@ export default function POS({ products, onAddTransaction, onPrintTransaction, la
                             <Clock className="w-3 h-3 inline-block mx-0.5" />
                             {formattedDate} - {formattedTime}
                           </span>
+                          
+                          {/* Status badges row */}
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {held.isDelivery ? (
+                              <span className="bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                                🛵 {lang === 'ar' ? 'دليفري' : 'Delivery'}
+                              </span>
+                            ) : (
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                theme === 'dark' ? 'bg-zinc-800 text-zinc-400 border-zinc-750' : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}>
+                                🏠 {lang === 'ar' ? 'في الصالة' : 'In-Store'}
+                              </span>
+                            )}
+                            
+                            {held.isPaid ? (
+                              <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                                💵 {lang === 'ar' ? 'خالص (مدفوع)' : 'Paid'}
+                              </span>
+                            ) : (
+                              <span className="bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                                💳 {lang === 'ar' ? 'غير مدفوع' : 'Unpaid'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className={lang === 'ar' ? 'text-left' : 'text-right'}>
                           <span className="font-extrabold text-sm text-indigo-600 dark:text-indigo-400 block">
-                            {totalSum.toLocaleString()} {t.currency}
+                            {totalFinal.toLocaleString()} {t.currency}
                           </span>
                           <span className={`text-[10px] block mt-0.5 ${textSecondaryClass}`}>
                             {itemsCount} {lang === 'ar' ? 'قطع' : 'pcs'}
+                            {held.isDelivery && held.deliveryFee ? (lang === 'ar' ? ` (+${held.deliveryFee} توصيل)` : ` (+${held.deliveryFee} delivery)`) : ''}
                           </span>
                         </div>
                       </div>

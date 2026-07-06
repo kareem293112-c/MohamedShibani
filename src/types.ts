@@ -32,6 +32,11 @@ export interface Transaction {
   totalProfit: number; // صافي الربح
   date: string; // تاريخ العملية
   notes?: string; // ملاحظات إضافية
+  isDelivery?: boolean; // هل الطلب دليفري/توصيل؟
+  deliveryDriver?: string; // اسم مندوب التوصيل
+  deliveryFee?: number; // رسوم التوصيل
+  deliveryStatus?: 'pending' | 'shipping' | 'delivered'; // حالة التوصيل
+  deliveryAddress?: string; // عنوان وهاتف التوصيل
 }
 
 export interface DailyReport {
@@ -56,4 +61,22 @@ export interface HeldOrder {
   cart: CartItem[];
   notes?: string;
   heldAt: string;
+  isDelivery?: boolean;
+  deliveryDriver?: string;
+  deliveryFee?: number;
+  deliveryAddress?: string;
+  isPaid?: boolean; // هل تم دفع الحساب مسبقاً؟
+  amountPaid?: number; // المبلغ المدفوع مسبقاً
 }
+
+export interface Requirement {
+  id: string;
+  name: string;
+  quantity: number;
+  estimatedCost?: number;
+  priority: 'low' | 'medium' | 'high';
+  notes?: string;
+  status: 'to_buy' | 'purchased';
+  createdAt: string;
+}
+

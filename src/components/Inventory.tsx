@@ -320,24 +320,25 @@ export default function Inventory({ products, onAddProduct, onUpdateProduct, onD
               : 'bg-indigo-50/60 border-indigo-100/50'
           }`}>
             <Percent className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mx-2" />
-            <div className="text-xs">
-              {costPrice !== '' && sellingPrice !== '' ? (
-                (() => {
-                  const profit = parseFloat(sellingPrice.toString()) - parseFloat(costPrice.toString());
-                  const margin = parseFloat(sellingPrice.toString()) > 0 ? (profit / parseFloat(sellingPrice.toString())) * 100 : 0;
-                  return (
-                    <span className={theme === 'eye-care' ? 'text-[#433422]' : 'text-indigo-800 dark:text-indigo-300'}>
-                      {t.invProfitEstimate} <strong className="font-bold text-indigo-700 dark:text-indigo-400">{profit.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</strong>
-                      {' '}({t.invProfitMarginEstimate} <strong className="font-bold text-indigo-700 dark:text-indigo-400">{margin.toFixed(0)}%</strong>)
-                    </span>
-                  );
-                })()
-              ) : (
-                <span className={textSecondaryClass}>{t.dashMarginDesc}</span>
-              )}
-            </div>
+             <div className="text-xs">
+               {costPrice !== '' && sellingPrice !== '' ? (
+                 (() => {
+                   const profit = parseFloat(sellingPrice.toString()) - parseFloat(costPrice.toString());
+                   const margin = parseFloat(sellingPrice.toString()) > 0 ? (profit / parseFloat(sellingPrice.toString())) * 100 : 0;
+                   const markup = parseFloat(costPrice.toString()) > 0 ? (profit / parseFloat(costPrice.toString())) * 100 : 100;
+                   return (
+                     <span className={theme === 'eye-care' ? 'text-[#433422]' : 'text-indigo-800 dark:text-indigo-300'}>
+                       {t.invProfitEstimate} <strong className="font-bold text-indigo-700 dark:text-indigo-400">{profit.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}</strong>
+                       {' '}({lang === 'ar' ? 'هامش البيع:' : 'Margin:'} <strong className="font-bold text-indigo-700 dark:text-indigo-400">{margin.toFixed(0)}%</strong>,{' '}
+                       {lang === 'ar' ? 'مربح التكلفة:' : 'Markup:'} <strong className="font-bold text-indigo-700 dark:text-indigo-400">{markup.toFixed(0)}%</strong>)
+                     </span>
+                   );
+                 })()
+               ) : (
+                 <span className={textSecondaryClass}>{t.dashMarginDesc}</span>
+               )}
+             </div>
           </div>
-
           {/* Submit Button */}
           <div className="md:col-span-2 lg:col-span-5 flex justify-end gap-3 pt-2">
             <button
@@ -468,14 +469,24 @@ export default function Inventory({ products, onAddProduct, onUpdateProduct, onD
 
                       {/* Net profit unit */}
                       <td className={`p-4 ${lang === 'ar' ? 'text-left' : 'text-right'}`}>
-                        <div className={`font-mono font-bold ${profitUnit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        <div className={`font-mono font-bold ${profitUnit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                           {profitUnit >= 0 ? '+' : ''}{profitUnit.toLocaleString(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 })} {t.currency}
                         </div>
-                        <div className={`text-[10px] ${textTertiaryClass}`}>
-                          {lang === 'ar' ? 'هامش:' : 'Margin:'} {prod.sellingPrice > 0 ? ((profitUnit / prod.sellingPrice) * 100).toFixed(0) : 0}%
+                        <div className={`text-[10px] ${textTertiaryClass} mt-1 space-y-0.5`}>
+                          <div>
+                            {lang === 'ar' ? 'هامش (من البيع):' : 'Margin (of Sale):'}{' '}
+                            <span className="font-bold text-slate-700 dark:text-zinc-300">
+                              {prod.sellingPrice > 0 ? ((profitUnit / prod.sellingPrice) * 100).toFixed(0) : 0}%
+                            </span>
+                          </div>
+                          <div>
+                            {lang === 'ar' ? 'مربح (من التكلفة):' : 'Markup (of Cost):'}{' '}
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                              {prod.costPrice > 0 ? ((profitUnit / prod.costPrice) * 100).toFixed(0) : 100}%
+                            </span>
+                          </div>
                         </div>
                       </td>
-
                       {/* Actions */}
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
